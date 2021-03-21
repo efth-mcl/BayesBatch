@@ -1,0 +1,9 @@
+scikit-image
+scikit-learn
+tensorflow
+bayesian-optimization
+pandas_ml
+git+https://github.com/mwv/zca
+numpy
+matplotlib
+pandas
