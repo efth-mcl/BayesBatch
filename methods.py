@@ -109,11 +109,8 @@ def create_model(**kwargs):
     l2_3 = kwargs['l2_3']
     l2_4 = kwargs['l2_4']
     layers_123_dist = kwargs['layers_123_dist']
-    kernel_size_35_dist = kwargs['kernel_size_35_dist']
-    if kernel_size_35_dist > 0.5:
-        kernel_size = (5, 5)
-    else:
-        kernel_size = (3, 3)
+    kernel_size = (3, 3)
+
     l2_1 = tf.keras.regularizers.l2(l2_1)
     l2_2 = tf.keras.regularizers.l2(l2_2)
     l2_3 = tf.keras.regularizers.l2(l2_3)
@@ -177,6 +174,7 @@ def simple_train(dataset: FashionMnistDataset, epochs, bayes=False, **kwargs):
     _, test_accuracy = model.evaluate(dataset.x_test, dataset.y_test)
     if bayes:
         return test_accuracy
+    history = history.history
     return test_accuracy, history, model.predict(dataset.x_test)
 
 
@@ -190,19 +188,20 @@ def increase_batch_size_train(dataset: FashionMnistDataset, epochs, bayes=False,
     h = model.fit(dataset.x_train, dataset.y_train, batch_size=b_s, epochs=1,
                   validation_data=(dataset.x_val, dataset.y_val),
                   callbacks=callbacks)
-    history.append(h)
+    history.append(h.history)
     _, val_accuracy = model.evaluate(dataset.x_val, dataset.y_val)
     _, train_accuracy = model.evaluate(dataset.x_train, dataset.y_train)
 
     while True:
         if abs(val_accuracy - train_accuracy) > 0.01:
-            if b_s < 3000:
+            # memoey drop so we use up to 1000
+            if b_s < 1000:
                 b_s = round(b_s * 1.25)
         print('batchsize: {0}'.format(b_s))
         h = model.fit(dataset.x_train, dataset.y_train, batch_size=b_s,
                       epochs=epochs, validation_data=(dataset.x_val, dataset.y_val),
                       callbacks=callbacks)
-        history.append(h)
+        history.append(h.history)
         _, val_accuracy = model.evaluate(dataset.x_val, dataset.y_val)
         _, train_accuracy = model.evaluate(dataset.x_train, dataset.y_train)
 
@@ -213,14 +212,19 @@ def increase_batch_size_train(dataset: FashionMnistDataset, epochs, bayes=False,
     if bayes:
         return test_accuracy
     else:
-        return test_accuracy, history, model.predict(dataset.x_test)
+        history_merge = {'loss': [], 'acc' : [], 'val_loss': [], 'val_acc': []}
+        for h in history:
+            for k, _ in h.items():
+                history_merge[k] += h[k]
+        return test_accuracy, history_merge, model.predict(dataset.x_test)
 
 
 def create_callbacks():
     callbacks = []
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         verbose=1,
-        save_weights_only=True)
+        save_weights_only=True,
+        filepath='.')
     callbacks.append(cp_callback)
 
     early_call = tf.keras.callbacks.EarlyStopping(monitor='val_acc', patience=7, min_delta=0.02)
